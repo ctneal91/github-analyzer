@@ -1,6 +1,7 @@
 class GithubClient
-  BASE_URL = "https://api.github.com".freeze
-  EVENTS_ENDPOINT = "/events".freeze
+  BASE_URL = "https://api.github.com"
+  EVENTS_PATH = "/events"
+  LOW_RATE_LIMIT_THRESHOLD = 10
 
   class RateLimitExceeded < StandardError
     attr_reader :resets_at
@@ -13,114 +14,128 @@ class GithubClient
 
   class ApiError < StandardError; end
 
-  def initialize
-    @connection = Faraday.new(url: BASE_URL) do |f|
-      f.request :json
-      f.response :json
-      f.response :raise_error
-    end
+  def initialize(logger: Rails.logger)
+    @logger = logger
+    @connection = build_connection
   end
 
   def fetch_events
-    check_rate_limit!
+    get(EVENTS_PATH)
+  end
 
-    response = @connection.get(EVENTS_ENDPOINT) do |req|
-      req.headers["Accept"] = "application/vnd.github.v3+json"
-      req.headers["User-Agent"] = "GitHubAnalyzer/1.0"
-    end
+  def fetch_actor(url)
+    get(url)
+  rescue Faraday::ResourceNotFound
+    log_not_found("actor", url)
+    nil
+  end
 
-    update_rate_limit!(response)
-    log_request_success(EVENTS_ENDPOINT, response)
+  def fetch_repository(url)
+    get(url)
+  rescue Faraday::ResourceNotFound
+    log_not_found("repository", url)
+    nil
+  end
 
-    response.body
+  def rate_limit_state
+    RateLimitState.for(events_endpoint)
+  end
+
+  private
+
+  def get(path)
+    ensure_rate_limit_available!
+    response = execute_request(path)
+    process_response(response, path)
+  rescue Faraday::ResourceNotFound
+    raise
   rescue Faraday::ClientError => e
     handle_client_error(e)
   rescue Faraday::Error => e
     raise ApiError, "GitHub API error: #{e.message}"
   end
 
-  def fetch_actor(url)
-    fetch_resource(url, "actor")
-  end
-
-  def fetch_repository(url)
-    fetch_resource(url, "repository")
-  end
-
-  def rate_limit_state
-    RateLimitState.for(full_url(EVENTS_ENDPOINT))
-  end
-
-  private
-
-  def fetch_resource(url, resource_type)
-    check_rate_limit!
-
-    response = @connection.get(url) do |req|
+  def execute_request(path)
+    @connection.get(path) do |req|
       req.headers["Accept"] = "application/vnd.github.v3+json"
       req.headers["User-Agent"] = "GitHubAnalyzer/1.0"
     end
-
-    update_rate_limit!(response)
-    log_request_success(url, response)
-
-    response.body
-  rescue Faraday::ResourceNotFound
-    Rails.logger.warn("[GitHubClient] #{resource_type} not found: #{url}")
-    nil
-  rescue Faraday::ClientError => e
-    handle_client_error(e)
-  rescue Faraday::Error => e
-    raise ApiError, "GitHub API error fetching #{resource_type}: #{e.message}"
   end
 
-  def check_rate_limit!
+  def process_response(response, path)
+    update_rate_limit(response)
+    log_success(path, response)
+    response.body
+  end
+
+  def ensure_rate_limit_available!
     state = rate_limit_state
     return if state.can_make_request?
 
-    Rails.logger.warn(
-      "[GitHubClient] Rate limit exhausted. Resets at #{state.resets_at}"
-    )
+    @logger.warn("[GithubClient] Rate limit exhausted. Resets at #{state.resets_at}")
     raise RateLimitExceeded, state.resets_at
   end
 
-  def update_rate_limit!(response)
-    remaining = response.headers["x-ratelimit-remaining"]&.to_i
-    reset_time = response.headers["x-ratelimit-reset"]&.to_i
-
+  def update_rate_limit(response)
+    remaining = extract_remaining(response)
+    reset_time = extract_reset_time(response)
     return unless remaining && reset_time
 
     rate_limit_state.record_request!(remaining: remaining, resets_at: reset_time)
+    warn_if_rate_limit_low(remaining)
+  end
 
-    if remaining < 10
-      Rails.logger.warn(
-        "[GitHubClient] Rate limit low: #{remaining} requests remaining"
-      )
-    end
+  def extract_remaining(response)
+    response.headers["x-ratelimit-remaining"]&.to_i
+  end
+
+  def extract_reset_time(response)
+    response.headers["x-ratelimit-reset"]&.to_i
+  end
+
+  def warn_if_rate_limit_low(remaining)
+    return unless remaining < LOW_RATE_LIMIT_THRESHOLD
+    @logger.warn("[GithubClient] Rate limit low: #{remaining} requests remaining")
   end
 
   def handle_client_error(error)
-    if error.response&.dig(:status) == 403
-      reset_time = error.response&.dig(:headers, "x-ratelimit-reset")&.to_i
-      if reset_time
-        resets_at = Time.at(reset_time)
-        rate_limit_state.record_request!(remaining: 0, resets_at: reset_time)
-        raise RateLimitExceeded, resets_at
-      end
-    end
-
+    raise RateLimitExceeded, parse_reset_time(error) if rate_limit_error?(error)
     raise ApiError, "GitHub API client error: #{error.message}"
   end
 
-  def log_request_success(endpoint, response)
-    remaining = response.headers["x-ratelimit-remaining"]
-    Rails.logger.info(
-      "[GitHubClient] Request to #{endpoint} successful. " \
-      "Rate limit remaining: #{remaining}"
-    )
+  def rate_limit_error?(error)
+    return false unless error.response&.dig(:status) == 403
+    reset_time = parse_reset_time(error)
+    return false unless reset_time
+
+    rate_limit_state.record_request!(remaining: 0, resets_at: reset_time.to_i)
+    true
   end
 
-  def full_url(endpoint)
-    "#{BASE_URL}#{endpoint}"
+  def parse_reset_time(error)
+    timestamp = error.response&.dig(:headers, "x-ratelimit-reset")&.to_i
+    return nil unless timestamp&.positive?
+    Time.at(timestamp)
+  end
+
+  def log_success(path, response)
+    remaining = extract_remaining(response)
+    @logger.info("[GithubClient] GET #{path} - OK (#{remaining} remaining)")
+  end
+
+  def log_not_found(resource_type, url)
+    @logger.warn("[GithubClient] #{resource_type} not found: #{url}")
+  end
+
+  def build_connection
+    Faraday.new(url: BASE_URL) do |conn|
+      conn.request :json
+      conn.response :json
+      conn.response :raise_error
+    end
+  end
+
+  def events_endpoint
+    "#{BASE_URL}#{EVENTS_PATH}"
   end
 end

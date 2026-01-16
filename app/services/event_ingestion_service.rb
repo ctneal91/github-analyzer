@@ -1,22 +1,25 @@
 class EventIngestionService
-  def initialize(client: GithubClient.new)
+  PUSH_EVENT_TYPE = "PushEvent"
+
+  def initialize(client: GithubClient.new, logger: Rails.logger)
     @client = client
+    @logger = logger
   end
 
   def ingest
-    Rails.logger.info("[EventIngestion] Starting ingestion...")
+    @logger.info("[EventIngestion] Starting...")
+    result = IngestionResult.new
 
     events = fetch_events
-    return { ingested: 0, skipped: 0, errors: 0 } if events.empty?
+    return empty_result if events.empty?
 
-    push_events = filter_push_events(events)
-    Rails.logger.info(
-      "[EventIngestion] Found #{push_events.size} push events out of #{events.size} total"
-    )
+    push_events = select_push_events(events)
+    log_event_count(events.size, push_events.size)
 
-    results = process_events(push_events)
-    log_results(results)
-    results
+    process_events(push_events, result)
+    log_completion(result)
+
+    result.to_h
   end
 
   private
@@ -24,59 +27,47 @@ class EventIngestionService
   def fetch_events
     @client.fetch_events
   rescue GithubClient::RateLimitExceeded => e
-    Rails.logger.warn(
-      "[EventIngestion] Rate limit exceeded. Resets at #{e.resets_at}"
-    )
+    @logger.warn("[EventIngestion] Rate limited until #{e.resets_at}")
     []
   rescue GithubClient::ApiError => e
-    Rails.logger.error("[EventIngestion] API error: #{e.message}")
+    @logger.error("[EventIngestion] API error: #{e.message}")
     []
   end
 
-  def filter_push_events(events)
-    events.select { |e| e["type"] == "PushEvent" }
+  def select_push_events(events)
+    events.select { |event| event["type"] == PUSH_EVENT_TYPE }
   end
 
-  def process_events(events)
-    results = { ingested: 0, skipped: 0, errors: 0 }
-
-    events.each do |event_data|
-      result = process_single_event(event_data)
-      results[result] += 1
-    end
-
-    results
+  def process_events(events, result)
+    events.each { |event| process_event(event, result) }
   end
 
-  def process_single_event(event_data)
-    github_event_id = event_data["id"]
+  def process_event(event_data, result)
+    event_id = event_data["id"]
 
-    if PushEvent.exists?(github_event_id: github_event_id)
-      Rails.logger.debug(
-        "[EventIngestion] Skipping duplicate event: #{github_event_id}"
-      )
-      return :skipped
+    if already_ingested?(event_id)
+      @logger.debug("[EventIngestion] Duplicate: #{event_id}")
+      result.record_skipped
+      return
     end
 
     create_push_event(event_data)
-    Rails.logger.info(
-      "[EventIngestion] Ingested event: #{github_event_id}"
-    )
-    :ingested
+    @logger.info("[EventIngestion] Ingested: #{event_id}")
+    result.record_processed
   rescue ActiveRecord::RecordInvalid => e
-    Rails.logger.error(
-      "[EventIngestion] Failed to save event #{github_event_id}: #{e.message}"
-    )
-    :errors
+    @logger.error("[EventIngestion] Invalid event #{event_id}: #{e.message}")
+    result.record_error
   rescue StandardError => e
-    Rails.logger.error(
-      "[EventIngestion] Unexpected error for event #{github_event_id}: #{e.message}"
-    )
-    :errors
+    @logger.error("[EventIngestion] Error processing #{event_id}: #{e.message}")
+    result.record_error
+  end
+
+  def already_ingested?(event_id)
+    PushEvent.exists?(github_event_id: event_id)
   end
 
   def create_push_event(event_data)
-    payload = event_data["payload"] || {}
+    payload = event_data.fetch("payload", {})
 
     PushEvent.create!(
       github_event_id: event_data["id"],
@@ -88,12 +79,18 @@ class EventIngestionService
     )
   end
 
-  def log_results(results)
-    Rails.logger.info(
-      "[EventIngestion] Completed. " \
-      "Ingested: #{results[:ingested]}, " \
-      "Skipped: #{results[:skipped]}, " \
-      "Errors: #{results[:errors]}"
+  def log_event_count(total, push_count)
+    @logger.info("[EventIngestion] Found #{push_count}/#{total} push events")
+  end
+
+  def log_completion(result)
+    @logger.info(
+      "[EventIngestion] Done: #{result.processed} ingested, " \
+      "#{result.skipped} skipped, #{result.errors} errors"
     )
+  end
+
+  def empty_result
+    { processed: 0, skipped: 0, errors: 0 }
   end
 end

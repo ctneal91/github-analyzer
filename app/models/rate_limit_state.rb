@@ -1,18 +1,20 @@
 class RateLimitState < ApplicationRecord
+  DEFAULT_LIMIT = 60
+  RESET_INTERVAL = 1.hour
+
   validates :endpoint, presence: true, uniqueness: true
   validates :remaining, presence: true, numericality: { only_integer: true, greater_than_or_equal_to: 0 }
   validates :resets_at, presence: true
 
   def self.for(endpoint)
     find_or_create_by!(endpoint: endpoint) do |state|
-      state.remaining = 60
-      state.resets_at = 1.hour.from_now
+      state.remaining = DEFAULT_LIMIT
+      state.resets_at = RESET_INTERVAL.from_now
     end
   end
 
   def can_make_request?
-    return true if reset_if_expired
-    remaining > 0
+    reset_if_expired || requests_remaining?
   end
 
   def record_request!(remaining:, resets_at:)
@@ -25,9 +27,21 @@ class RateLimitState < ApplicationRecord
 
   private
 
+  def requests_remaining?
+    remaining > 0
+  end
+
   def reset_if_expired
-    return false if resets_at > Time.current
-    update!(remaining: 60, resets_at: 1.hour.from_now)
+    return false unless expired?
+    reset!
     true
+  end
+
+  def expired?
+    resets_at <= Time.current
+  end
+
+  def reset!
+    update!(remaining: DEFAULT_LIMIT, resets_at: RESET_INTERVAL.from_now)
   end
 end

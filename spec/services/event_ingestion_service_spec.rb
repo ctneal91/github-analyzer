@@ -46,7 +46,7 @@ RSpec.describe EventIngestionService do
 
       it "returns ingestion results" do
         results = service.ingest
-        expect(results[:ingested]).to eq(1)
+        expect(results[:processed]).to eq(1)
         expect(results[:skipped]).to eq(0)
         expect(results[:errors]).to eq(0)
       end
@@ -65,10 +65,10 @@ RSpec.describe EventIngestionService do
       it "logs ingestion progress" do
         allow(Rails.logger).to receive(:info)
         allow(Rails.logger).to receive(:debug)
-        expect(Rails.logger).to receive(:info).with(/Starting ingestion/)
-        expect(Rails.logger).to receive(:info).with(/Found 1 push events/)
-        expect(Rails.logger).to receive(:info).with(/Ingested event/)
-        expect(Rails.logger).to receive(:info).with(/Completed/)
+        expect(Rails.logger).to receive(:info).with(/Starting/)
+        expect(Rails.logger).to receive(:info).with(/Found 1\/2 push events/)
+        expect(Rails.logger).to receive(:info).with(/Ingested/)
+        expect(Rails.logger).to receive(:info).with(/Done/)
         service.ingest
       end
     end
@@ -87,12 +87,13 @@ RSpec.describe EventIngestionService do
       it "returns skipped count" do
         results = service.ingest
         expect(results[:skipped]).to eq(1)
-        expect(results[:ingested]).to eq(0)
+        expect(results[:processed]).to eq(0)
       end
 
       it "logs skipped events" do
         allow(Rails.logger).to receive(:debug)
-        expect(Rails.logger).to receive(:debug).with(/Skipping duplicate/)
+        allow(Rails.logger).to receive(:info)
+        expect(Rails.logger).to receive(:debug).with(/Duplicate/)
         service.ingest
       end
     end
@@ -105,12 +106,12 @@ RSpec.describe EventIngestionService do
 
       it "returns zero counts" do
         results = service.ingest
-        expect(results).to eq({ ingested: 0, skipped: 0, errors: 0 })
+        expect(results).to eq({ processed: 0, skipped: 0, errors: 0 })
       end
 
       it "logs the rate limit" do
         allow(Rails.logger).to receive(:info)
-        expect(Rails.logger).to receive(:warn).with(/Rate limit exceeded/)
+        expect(Rails.logger).to receive(:warn).with(/Rate limited/)
         service.ingest
       end
     end
@@ -123,7 +124,7 @@ RSpec.describe EventIngestionService do
 
       it "returns zero counts" do
         results = service.ingest
-        expect(results).to eq({ ingested: 0, skipped: 0, errors: 0 })
+        expect(results).to eq({ processed: 0, skipped: 0, errors: 0 })
       end
 
       it "logs the error" do
@@ -140,7 +141,7 @@ RSpec.describe EventIngestionService do
 
       it "returns zero counts" do
         results = service.ingest
-        expect(results).to eq({ ingested: 0, skipped: 0, errors: 0 })
+        expect(results).to eq({ processed: 0, skipped: 0, errors: 0 })
       end
     end
 
@@ -166,12 +167,12 @@ RSpec.describe EventIngestionService do
       it "counts as error" do
         results = service.ingest
         expect(results[:errors]).to eq(1)
-        expect(results[:ingested]).to eq(0)
+        expect(results[:processed]).to eq(0)
       end
 
       it "logs the error" do
         allow(Rails.logger).to receive(:info)
-        expect(Rails.logger).to receive(:error).with(/Failed to save event/)
+        expect(Rails.logger).to receive(:error).with(/Invalid event/)
         service.ingest
       end
     end
@@ -190,7 +191,7 @@ RSpec.describe EventIngestionService do
 
       it "logs the error" do
         allow(Rails.logger).to receive(:info)
-        expect(Rails.logger).to receive(:error).with(/Unexpected error/)
+        expect(Rails.logger).to receive(:error).with(/Error processing/)
         service.ingest
       end
     end
@@ -214,7 +215,7 @@ RSpec.describe EventIngestionService do
 
       it "returns correct count" do
         results = service.ingest
-        expect(results[:ingested]).to eq(2)
+        expect(results[:processed]).to eq(2)
       end
     end
   end

@@ -45,7 +45,7 @@ RSpec.describe GithubClient do
       end
 
       it "logs the request" do
-        expect(Rails.logger).to receive(:info).with(/Request to .* successful/)
+        expect(Rails.logger).to receive(:info).with(/GET .* - OK/)
         client.fetch_events
       end
     end
