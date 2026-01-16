@@ -7,7 +7,7 @@ namespace :github do
     results = service.ingest
 
     puts "\nIngestion complete!"
-    puts "  Ingested: #{results[:ingested]}"
+    puts "  Ingested: #{results[:processed]}"
     puts "  Skipped:  #{results[:skipped]} (duplicates)"
     puts "  Errors:   #{results[:errors]}"
 
@@ -22,7 +22,7 @@ namespace :github do
     results = service.enrich_all
 
     puts "\nEnrichment complete!"
-    puts "  Enriched: #{results[:enriched]}"
+    puts "  Enriched: #{results[:processed]}"
     puts "  Skipped:  #{results[:skipped]}"
     puts "  Errors:   #{results[:errors]}"
 
