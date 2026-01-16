@@ -33,6 +33,9 @@
 # Ignore coverage reports
 /coverage/
 
+# RSpec examples status
+/spec/examples.txt
+
 # Ignore node_modules
 /node_modules/
 
