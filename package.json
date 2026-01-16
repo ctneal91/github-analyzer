@@ -1,0 +1,21 @@
+{
+  "name": "github-analyzer",
+  "version": "1.0.0",
+  "description": "GitHub events ingestion and analysis service",
+  "private": true,
+  "scripts": {
+    "prepare": "husky",
+    "lint:ruby": "bundle exec rubocop",
+    "lint:ruby:fix": "bundle exec rubocop --autocorrect",
+    "test": "bundle exec rspec"
+  },
+  "devDependencies": {
+    "husky": "^9.0.0",
+    "lint-staged": "^15.0.0"
+  },
+  "lint-staged": {
+    "*.rb": [
+      "bundle exec rubocop --autocorrect --force-exclusion"
+    ]
+  }
+}
