@@ -1,4 +1,6 @@
 class PushEvent < ApplicationRecord
+  include StorablePayload
+
   belongs_to :repository, optional: true
   belongs_to :actor, optional: true
 

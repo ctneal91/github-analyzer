@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_01_16_032318) do
+ActiveRecord::Schema[8.1].define(version: 2026_01_16_161017) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -19,10 +19,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_01_16_032318) do
     t.datetime "created_at", null: false
     t.bigint "github_id", null: false
     t.string "login", null: false
+    t.string "payload_key"
     t.jsonb "raw_payload"
     t.datetime "updated_at", null: false
     t.index ["github_id"], name: "index_actors_on_github_id", unique: true
     t.index ["login"], name: "index_actors_on_login"
+    t.index ["payload_key"], name: "index_actors_on_payload_key"
   end
 
   create_table "push_events", force: :cascade do |t|
@@ -32,6 +34,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_01_16_032318) do
     t.datetime "enriched_at"
     t.string "github_event_id", null: false
     t.string "head", null: false
+    t.string "payload_key"
     t.bigint "push_id", null: false
     t.jsonb "raw_payload", null: false
     t.string "ref", null: false
@@ -40,6 +43,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_01_16_032318) do
     t.index ["actor_id"], name: "index_push_events_on_actor_id"
     t.index ["enriched_at"], name: "index_push_events_on_enriched_at"
     t.index ["github_event_id"], name: "index_push_events_on_github_event_id", unique: true
+    t.index ["payload_key"], name: "index_push_events_on_payload_key"
     t.index ["push_id"], name: "index_push_events_on_push_id"
     t.index ["ref"], name: "index_push_events_on_ref"
     t.index ["repository_id"], name: "index_push_events_on_repository_id"
@@ -59,10 +63,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_01_16_032318) do
     t.string "full_name", null: false
     t.bigint "github_id", null: false
     t.string "name", null: false
+    t.string "payload_key"
     t.jsonb "raw_payload"
     t.datetime "updated_at", null: false
     t.index ["full_name"], name: "index_repositories_on_full_name"
     t.index ["github_id"], name: "index_repositories_on_github_id", unique: true
+    t.index ["payload_key"], name: "index_repositories_on_payload_key"
   end
 
   add_foreign_key "push_events", "actors"

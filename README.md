@@ -129,6 +129,8 @@ GitHub Analyzer Statistics
 ```
 app/
 ├── models/
+│   ├── concerns/
+│   │   └── storable_payload.rb # S3 payload storage concern
 │   ├── actor.rb              # GitHub users
 │   ├── push_event.rb         # Push events with metadata
 │   ├── rate_limit_state.rb   # API rate limit tracking
@@ -139,6 +141,7 @@ app/
     ├── event_ingestion_service.rb  # Fetches and stores events
     ├── github_client.rb           # HTTP client with rate limiting
     ├── ingestion_result.rb        # Result tracking value object
+    ├── payload_storage_service.rb # S3 object storage operations
     └── repository_fetcher.rb      # Find/fetch repo data
 ```
 
@@ -168,11 +171,32 @@ Pre-commit hooks (via Husky) enforce:
 - RSpec tests pass
 - 90%+ line coverage maintained
 
+## Object Storage (Optional)
+
+Large raw payloads can be stored in S3-compatible object storage (MinIO) instead of PostgreSQL:
+
+```bash
+# Enable payload storage
+export PAYLOAD_STORAGE_ENABLED=true
+
+# Run ingestion (payloads will be stored in MinIO)
+bin/rails github:ingest
+```
+
+When enabled:
+- Raw JSON payloads are stored in MinIO/S3
+- Database stores only a reference key (`payload_key`)
+- Payloads are automatically retrieved when accessing `raw_payload`
+- Failed storage operations fall back to database storage
+
+Access MinIO console at http://localhost:9001 (minioadmin/minioadmin).
+
 ## Docker Services
 
 | Service | Port | Description |
 |---------|------|-------------|
 | db | 5432 | PostgreSQL database |
+| minio | 9000/9001 | S3-compatible object storage |
 | api | 3000 | Rails API server |
 | test | - | Test runner container |
 
@@ -185,3 +209,9 @@ Pre-commit hooks (via Husky) enforce:
 | POSTGRES_USER | postgres | Database user |
 | POSTGRES_PASSWORD | postgres | Database password |
 | RAILS_ENV | development | Rails environment |
+| PAYLOAD_STORAGE_ENABLED | false | Enable S3 payload storage |
+| AWS_ACCESS_KEY_ID | minioadmin | S3 access key |
+| AWS_SECRET_ACCESS_KEY | minioadmin | S3 secret key |
+| AWS_REGION | us-east-1 | S3 region |
+| S3_ENDPOINT | - | S3 endpoint (for MinIO) |
+| S3_BUCKET | github-analyzer-{env} | S3 bucket name |

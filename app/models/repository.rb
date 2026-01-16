@@ -1,4 +1,6 @@
 class Repository < ApplicationRecord
+  include StorablePayload
+
   has_many :push_events, dependent: :nullify
 
   validates :github_id, presence: true, uniqueness: true

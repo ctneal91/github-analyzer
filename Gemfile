@@ -23,6 +23,9 @@ gem "thruster", require: false
 # HTTP client for GitHub API
 gem "faraday"
 
+# AWS S3 SDK for object storage (MinIO compatible)
+gem "aws-sdk-s3"
+
 group :development, :test do
   gem "debug", platforms: %i[mri windows], require: "debug/prelude"
   gem "bundler-audit", require: false
