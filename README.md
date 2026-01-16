@@ -176,11 +176,16 @@ Pre-commit hooks (via Husky) enforce:
 Large raw payloads can be stored in S3-compatible object storage (MinIO) instead of PostgreSQL:
 
 ```bash
-# Enable payload storage
-export PAYLOAD_STORAGE_ENABLED=true
+# With Docker (MinIO is pre-configured)
+docker-compose exec -e PAYLOAD_STORAGE_ENABLED=true api bin/rails github:ingest
 
-# Run ingestion (payloads will be stored in MinIO)
-bin/rails github:ingest
+# Local development (requires MinIO running on localhost:9000)
+PAYLOAD_STORAGE_ENABLED=true \
+  AWS_ACCESS_KEY_ID=minioadmin \
+  AWS_SECRET_ACCESS_KEY=minioadmin \
+  S3_ENDPOINT=http://localhost:9000 \
+  S3_BUCKET=github-analyzer-development \
+  bin/rails github:ingest
 ```
 
 When enabled:
