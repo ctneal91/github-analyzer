@@ -1,0 +1,27 @@
+{
+  "name": "GitHub Analyzer Frontend",
+  "description": "React dashboard for GitHub Event Analyzer",
+  "repository": "https://github.com/yourusername/github-analyzer",
+  "keywords": ["react", "vite", "dashboard"],
+  "stack": "heroku-24",
+  "buildpacks": [
+    {
+      "url": "heroku/nodejs"
+    }
+  ],
+  "env": {
+    "NODE_ENV": {
+      "value": "production"
+    },
+    "VITE_API_URL": {
+      "description": "URL of the Rails API backend",
+      "required": true
+    }
+  },
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  }
+}

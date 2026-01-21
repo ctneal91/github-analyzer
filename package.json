@@ -7,7 +7,10 @@
     "prepare": "husky",
     "lint:ruby": "bundle exec rubocop",
     "lint:ruby:fix": "bundle exec rubocop --autocorrect",
-    "test": "bundle exec rspec"
+    "lint:frontend": "cd frontend && npm run lint",
+    "test": "bundle exec rspec",
+    "test:frontend": "cd frontend && npm run test:coverage",
+    "test:all": "bundle exec rspec && cd frontend && npm run test:coverage"
   },
   "devDependencies": {
     "husky": "^9.0.0",
@@ -16,6 +19,9 @@
   "lint-staged": {
     "*.rb": [
       "bundle exec rubocop --autocorrect --force-exclusion"
+    ],
+    "frontend/**/*.{ts,tsx}": [
+      "cd frontend && npm run lint"
     ]
   }
 }

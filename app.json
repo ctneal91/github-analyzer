@@ -1,0 +1,43 @@
+{
+  "name": "GitHub Event Analyzer",
+  "description": "Rails API + React dashboard for analyzing GitHub push events",
+  "repository": "https://github.com/yourusername/github-analyzer",
+  "keywords": ["rails", "react", "github", "analytics"],
+  "stack": "heroku-24",
+  "buildpacks": [
+    {
+      "url": "heroku/ruby"
+    }
+  ],
+  "env": {
+    "RAILS_ENV": {
+      "value": "production"
+    },
+    "RACK_ENV": {
+      "value": "production"
+    },
+    "RAILS_LOG_TO_STDOUT": {
+      "value": "enabled"
+    },
+    "RAILS_SERVE_STATIC_FILES": {
+      "value": "enabled"
+    },
+    "SECRET_KEY_BASE": {
+      "generator": "secret"
+    }
+  },
+  "addons": [
+    {
+      "plan": "heroku-postgresql:essential-0"
+    }
+  ],
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  },
+  "scripts": {
+    "postdeploy": "bundle exec rails db:migrate db:seed"
+  }
+}

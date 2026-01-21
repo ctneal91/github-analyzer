@@ -1,9 +1,46 @@
 #!/bin/sh
 
-echo "Running lint-staged..."
+# Detect package manager (yarn or npm)
+if [ -f "frontend/yarn.lock" ]; then
+  PKG_MGR="yarn"
+else
+  PKG_MGR="npm run"
+fi
+
+echo "Using package manager: $PKG_MGR"
+
+echo "=== Running lint-staged ==="
 npx lint-staged
 
-echo "Running RSpec tests with coverage check..."
+echo "=== Running RSpec tests with coverage check ==="
 bundle exec rspec
-
 # SimpleCov will fail if coverage < 90%
+
+echo "=== Running frontend checks ==="
+cd frontend
+
+echo "Running TypeScript type check..."
+$PKG_MGR typecheck
+if [ $? -ne 0 ]; then
+  echo "TypeScript type check failed!"
+  exit 1
+fi
+
+echo "Running ESLint..."
+$PKG_MGR lint
+if [ $? -ne 0 ]; then
+  echo "Frontend lint failed!"
+  exit 1
+fi
+
+echo "Running frontend tests with coverage check (90%+ required)..."
+$PKG_MGR test:coverage
+# Vitest will fail if coverage < 90%
+if [ $? -ne 0 ]; then
+  echo "Frontend tests or coverage check failed!"
+  exit 1
+fi
+
+cd ..
+
+echo "=== All pre-commit checks passed ==="
