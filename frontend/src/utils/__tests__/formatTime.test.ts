@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatTimeUntilReset } from "./formatTime";
+import { formatTimeUntilReset } from "../formatTime";
 
 describe("formatTimeUntilReset", () => {
   it("returns 'now' for zero seconds", () => {

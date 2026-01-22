@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
-import { usePolling } from "./usePolling";
+import { usePolling } from "../usePolling";
 
 describe("usePolling", () => {
   beforeEach(() => {

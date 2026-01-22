@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
-import { useAsyncData } from "./useAsyncData";
+import { useAsyncData } from "../useAsyncData";
 
 describe("useAsyncData", () => {
   it("starts in loading state", () => {
