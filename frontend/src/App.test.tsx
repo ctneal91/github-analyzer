@@ -1,93 +1,79 @@
-import { render, screen, act } from '@testing-library/react'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import App from './App'
+import { render, screen, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import App from "./App";
+import * as api from "./api";
 
-describe('App', () => {
+vi.mock("./api", () => ({
+  getStats: vi.fn(),
+  getRateLimit: vi.fn(),
+  triggerIngest: vi.fn(),
+  triggerEnrich: vi.fn(),
+  triggerSync: vi.fn(),
+}));
+
+const mockStats = {
+  total_events: 100,
+  enriched_events: 80,
+  unenriched_events: 20,
+  total_actors: 50,
+  total_repositories: 30,
+};
+
+const mockRateLimit = {
+  remaining: 42,
+  resets_at: "2024-01-01T12:00:00Z",
+  can_make_requests: true,
+  time_until_reset: 1800,
+};
+
+describe("App", () => {
   beforeEach(() => {
-    vi.useFakeTimers()
-  })
+    vi.clearAllMocks();
+    vi.mocked(api.getStats).mockResolvedValue(mockStats);
+    vi.mocked(api.getRateLimit).mockResolvedValue(mockRateLimit);
+  });
 
-  afterEach(() => {
-    vi.useRealTimers()
-  })
+  it("renders the Dashboard component", async () => {
+    render(<App />);
 
-  it('renders the main heading', () => {
-    render(<App />)
+    await waitFor(() => {
+      expect(screen.getByTestId("dashboard")).toBeInTheDocument();
+    });
+  });
 
-    expect(
-      screen.getByRole('heading', { name: /GitHub Event Analyzer/i })
-    ).toBeInTheDocument()
-  })
+  it("renders the main heading from Dashboard", async () => {
+    render(<App />);
 
-  it('renders the dashboard description', () => {
-    render(<App />)
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { name: /GitHub Event Analyzer/i })
+      ).toBeInTheDocument();
+    });
+  });
 
-    expect(
-      screen.getByText(/Dashboard for monitoring GitHub push events/i)
-    ).toBeInTheDocument()
-  })
+  it("displays stats from the API", async () => {
+    render(<App />);
 
-  it('renders the health status section', () => {
-    render(<App />)
+    await waitFor(() => {
+      expect(screen.getByTestId("stat-total-events")).toHaveTextContent("100");
+    });
+  });
 
-    expect(
-      screen.getByRole('heading', { name: /System Health/i })
-    ).toBeInTheDocument()
-    expect(screen.getByTestId('health-status')).toBeInTheDocument()
-  })
+  it("displays rate limit status", async () => {
+    render(<App />);
 
-  it('starts with loading status', () => {
-    render(<App />)
+    await waitFor(() => {
+      expect(screen.getByTestId("rate-limit-section")).toBeInTheDocument();
+    });
+  });
 
-    expect(screen.getByTestId('health-label')).toHaveTextContent('Loading...')
-  })
+  it("displays admin action buttons", async () => {
+    render(<App />);
 
-  it('renders check health button', () => {
-    render(<App />)
-
-    expect(
-      screen.getByRole('button', { name: /Check Health/i })
-    ).toBeInTheDocument()
-  })
-
-  it('sets status to loading when check health is clicked and returns to healthy', async () => {
-    render(<App />)
-
-    // Advance past initial timeout to get to healthy state
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(1100)
-    })
-    expect(screen.getByTestId('health-label')).toHaveTextContent('Healthy')
-
-    // Click the button using fireEvent (simpler than userEvent with fake timers)
-    await act(async () => {
-      screen.getByRole('button', { name: /Check Health/i }).click()
-    })
-
-    // Should be loading immediately after click
-    expect(screen.getByTestId('health-label')).toHaveTextContent('Loading...')
-
-    // Advance timers to complete the checkHealth timeout
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(1100)
-    })
-
-    // Should be healthy again after timeout completes
-    expect(screen.getByTestId('health-label')).toHaveTextContent('Healthy')
-  })
-
-  it('changes to healthy status after timeout', async () => {
-    render(<App />)
-
-    // Initially loading
-    expect(screen.getByTestId('health-label')).toHaveTextContent('Loading...')
-
-    // Fast-forward timers
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(1100)
-    })
-
-    // Should now be healthy
-    expect(screen.getByTestId('health-label')).toHaveTextContent('Healthy')
-  })
-})
+    await waitFor(() => {
+      expect(screen.getByTestId("btn-ingest")).toBeInTheDocument();
+      expect(screen.getByTestId("btn-enrich")).toBeInTheDocument();
+      expect(screen.getByTestId("btn-sync")).toBeInTheDocument();
+    });
+  });
+});
