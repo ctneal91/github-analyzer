@@ -23,6 +23,9 @@ gem "thruster", require: false
 # HTTP client for GitHub API
 gem "faraday"
 
+# CORS support for frontend
+gem "rack-cors"
+
 # AWS S3 SDK for object storage (MinIO compatible)
 gem "aws-sdk-s3"
 
